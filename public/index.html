@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RunBookCase — Walmart → SHV Load Bridge</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --ink: #1a2332;
+    --muted: #5b6b80;
+    --line: #e2e8f0;
+    --accent: #1d4ed8;
+    --accent-ink: #ffffff;
+    --ok: #15803d;
+    --ok-bg: #f0fdf4;
+    --warn: #b45309;
+    --warn-bg: #fffbeb;
+    --err: #b91c1c;
+    --err-bg: #fef2f2;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink);
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  header { margin-bottom: 24px; }
+  header h1 { font-size: 24px; letter-spacing: -0.02em; }
+  header p { color: var(--muted); margin-top: 4px; max-width: 70ch; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    background: #e0e9ff; color: var(--accent); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin-bottom: 18px; }
+  .card h2 { font-size: 16px; margin-bottom: 4px; }
+  .card .sub { color: var(--muted); font-size: 13.5px; margin-bottom: 12px; }
+
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  button.action {
+    font: 600 15px/1 inherit; padding: 12px 22px; border-radius: 9px; border: 1px solid transparent;
+    cursor: pointer; transition: transform 0.05s, opacity 0.15s;
+  }
+  button.action:active { transform: translateY(1px); }
+  button.action:disabled { opacity: 0.45; cursor: not-allowed; }
+  #fetchBtn { background: var(--accent); color: var(--accent-ink); }
+  #pushBtn { background: #0f172a; color: #fff; }
+  .status { font-size: 13.5px; color: var(--muted); }
+  .status.error { color: var(--err); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+  .tbl-scroll { overflow-x: auto; }
+
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 5px; padding: 2px 8px; white-space: nowrap; }
+  .tag.ok { background: var(--ok-bg); color: var(--ok); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .tag.err { background: var(--err-bg); color: var(--err); }
+
+  .result-section { border-left: 4px solid var(--line); padding-left: 16px; margin-top: 18px; }
+  .result-section.ok { border-color: var(--ok); }
+  .result-section.err { border-color: var(--err); }
+  .result-section.warn { border-color: var(--warn); }
+  .result-section h3 { font-size: 14.5px; margin-bottom: 8px; }
+  .result-section ul.reasons { margin: 4px 0 0 18px; }
+  .result-section ul.reasons li { margin-bottom: 2px; }
+
+  details.rules { margin-bottom: 18px; }
+  details.rules summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 15px; user-select: none;
+  }
+  details.rules summary::before { content: "▸"; transition: transform 0.15s; color: var(--muted); }
+  details.rules[open] summary::before { transform: rotate(90deg); }
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; }
+  @media (max-width: 800px) { .rules-grid { grid-template-columns: 1fr; } }
+  .rules-grid h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+  .flag-rule { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background: #fafbfc; }
+  .flag-rule b { font-size: 13.5px; }
+  .flag-rule p { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .flag-rule .sop { font-size: 11px; color: var(--accent); font-weight: 600; }
+
+  .empty { color: var(--muted); font-size: 13.5px; font-style: italic; }
+  .summary-line { font-size: 13.5px; margin-top: 10px; color: var(--muted); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="pill">SHV Logistics · Load Building Automation</span>
+    <h1>Walmart → SHV TMS Load Bridge</h1>
+    <p>Pulls open freight tenders from the Walmart portal, sanitizes them per the runbook SOP
+       (date reorder, weight cleanup, equipment mapping), and pushes ready loads into the SHV
+       system of record. Exception loads are held and flagged for follow-up — never pushed.</p>
+  </header>
+
+  <div class="card">
+    <details class="rules" id="rulesPanel" open>
+      <summary>Runbook rules applied by this app</summary>
+      <div class="rules-grid">
+        <div>
+          <h4>Field mapping &amp; formatting</h4>
+          <div class="tbl-scroll">
+            <table id="mappingTable">
+              <thead><tr><th>Walmart field</th><th>SOR field</th><th>Transform</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h4>Escalation / hold rules — flagged, never pushed</h4>
+          <div id="flagRules"></div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>Actions</h2>
+    <p class="sub">Step 1: fetch today's open tenders. Step 2: sanitize them and push the eligible loads to the SHV SOR.</p>
+    <div class="actions">
+      <button class="action" id="fetchBtn">Fetch Loads</button>
+      <button class="action" id="pushBtn" disabled>Sanitize &amp; Push</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div class="card" id="tendersCard" hidden>
+    <h2>Open Walmart tenders</h2>
+    <p class="sub" id="tendersSub"></p>
+    <div class="tbl-scroll">
+      <table id="tendersTable">
+        <thead><tr>
+          <th>Load #</th><th>Shipper</th><th>Origin</th><th>Destination</th>
+          <th>Ship</th><th>Deliver</th><th>Weight</th><th>Mode</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="resultsCard" hidden>
+    <h2>Push results</h2>
+    <p class="sub" id="sorMessage"></p>
+    <div id="acceptedSection" class="result-section ok" hidden>
+      <h3>✅ Accepted into the SOR (<span id="acceptedCount"></span>)</h3>
+      <div class="tbl-scroll">
+        <table id="acceptedTable">
+          <thead><tr>
+            <th>Load #</th><th>BOL</th><th>Shipper</th><th>Lane</th>
+            <th>Ship (DDMMYYYY)</th><th>Deliver (DDMMYYYY)</th><th>Weight</th><th>Equipment</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="rejectedSection" class="result-section err" hidden>
+      <h3>❌ Rejected by the SOR (<span id="rejectedCount"></span>)</h3>
+      <div id="rejectedList"></div>
+    </div>
+    <div id="flaggedSection" class="result-section warn" hidden>
+      <h3>⚠️ Flagged — held per SOP, not pushed (<span id="flaggedCount"></span>)</h3>
+      <div id="flaggedList"></div>
+    </div>
+    <p class="summary-line" id="summaryLine"></p>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let fetchedTenders = null;
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function setStatus(text, { error = false, busy = false } = {}) {
+  $('status').className = 'status' + (error ? ' error' : '');
+  $('status').innerHTML = (busy ? '<span class="spinner"></span>' : '') + esc(text);
+}
+
+async function loadRules() {
+  try {
+    const rules = await (await fetch('/api/rules')).json();
+    $('mappingTable').querySelector('tbody').innerHTML = rules.mapping.map((r) =>
+      `<tr><td class="mono">${esc(r.source)}</td><td class="mono">${esc(r.sor)}</td><td>${esc(r.transform)}</td></tr>`
+    ).join('');
+    $('flagRules').innerHTML = rules.flags.map((f) =>
+      `<div class="flag-rule">
+         <b>${esc(f.title)}</b> <span class="sop">${esc(f.sopRef)}</span>
+         <p><b>When:</b> ${esc(f.trigger)}</p>
+         <p><b>Action:</b> ${esc(f.action)}</p>
+       </div>`
+    ).join('');
+  } catch {
+    $('flagRules').innerHTML = '<p class="empty">Could not load rule definitions.</p>';
+  }
+}
+
+async function fetchLoads() {
+  $('fetchBtn').disabled = true;
+  $('pushBtn').disabled = true;
+  setStatus('Fetching open tenders from the Walmart portal…', { busy: true });
+  try {
+    const res = await fetch('/api/tenders');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+    fetchedTenders = data.loads ?? [];
+    $('tendersCard').hidden = false;
+    $('resultsCard').hidden = true;
+    $('tendersSub').textContent = `${fetchedTenders.length} open tender(s) from ${data.source ?? 'the Walmart portal'} — raw values as displayed in the portal.`;
+    $('tendersTable').querySelector('tbody').innerHTML = fetchedTenders.map((t) =>
+      `<tr>
+        <td class="mono">${esc(t.load_no)}</td>
+        <td>${esc(t.shipper_nm)}</td>
+        <td>${esc(t.orig_city)}, ${esc(t.orig_st)}</td>
+        <td>${esc(t.dest_city)}, ${esc(t.dest_st)}</td>
+        <td class="mono">${esc(t.shp_dt)}</td>
+        <td class="mono">${esc(t.del_dt)}</td>
+        <td class="mono">${esc(t.wgt ?? '—')}</td>
+        <td class="mono">${esc(t.mode)}</td>
+      </tr>`
+    ).join('') || '<tr><td colspan="8" class="empty">No open tenders right now.</td></tr>';
+
+    $('pushBtn').disabled = fetchedTenders.length === 0;
+    setStatus(fetchedTenders.length ? `Fetched ${fetchedTenders.length} tender(s). Review, then Sanitize & Push.` : 'No open tenders to build.');
+  } catch (err) {
+    setStatus(err.message, { error: true });
+  } finally {
+    $('fetchBtn').disabled = false;
+  }
+}
+
+function reasonTag(rule) {
+  const labels = { overweight: 'OVERWEIGHT', ambiguous_mode: 'AMBIGUOUS MODE', missing_weight: 'MISSING WEIGHT', invalid_field: 'BAD FIELD' };
+  return `<span class="tag warn">${labels[rule] ?? esc(rule).toUpperCase()}</span>`;
+}
+
+async function sanitizeAndPush() {
+  $('pushBtn').disabled = true;
+  $('fetchBtn').disabled = true;
+  setStatus('Sanitizing and pushing eligible loads to the SHV SOR…', { busy: true });
+  try {
+    const res = await fetch('/api/sanitize-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loads: fetchedTenders }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+    $('resultsCard').hidden = false;
+    $('sorMessage').textContent = data.sorMessage ?? '';
+
+    const acc = data.accepted ?? [], rej = data.rejected ?? [], flg = data.flagged ?? [];
+
+    $('acceptedSection').hidden = acc.length === 0;
+    $('acceptedCount').textContent = acc.length;
+    $('acceptedTable').querySelector('tbody').innerHTML = acc.map(({ after }) =>
+      `<tr>
+        <td class="mono">${esc(after?.load_number)}</td>
+        <td class="mono">${esc(after?.bol_number)}</td>
+        <td>${esc(after?.shipper_name)}</td>
+        <td>${esc(after?.origin_city)}, ${esc(after?.origin_state)} → ${esc(after?.destination_city)}, ${esc(after?.destination_state)}</td>
+        <td class="mono">${esc(after?.ship_date)}</td>
+        <td class="mono">${esc(after?.delivery_date)}</td>
+        <td class="mono">${esc(after?.weight)}</td>
+        <td>${esc(after?.equipment_type)}</td>
+      </tr>`
+    ).join('');
+
+    $('rejectedSection').hidden = rej.length === 0;
+    $('rejectedCount').textContent = rej.length;
+    $('rejectedList').innerHTML = rej.map((r) =>
+      `<div style="margin-bottom:10px">
+         <span class="tag err">${esc(r.load_number)}</span>
+         <ul class="reasons">${(r.errors ?? []).map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
+       </div>`
+    ).join('');
+
+    $('flaggedSection').hidden = flg.length === 0;
+    $('flaggedCount').textContent = flg.length;
+    $('flaggedList').innerHTML = flg.map((f) =>
+      `<div style="margin-bottom:10px">
+         <span class="tag warn">${esc(f.load_number)}</span>
+         ${(f.reasons ?? []).map((x) => reasonTag(x.rule)).join(' ')}
+         <ul class="reasons">${(f.reasons ?? []).map((x) => `<li>${esc(x.detail)}</li>`).join('')}</ul>
+       </div>`
+    ).join('');
+
+    $('summaryLine').textContent =
+      `Summary: ${acc.length} pushed · ${rej.length} rejected by the SOR · ${flg.length} held for follow-up with Walmart.`;
+    setStatus('Done. Pushes are upserts — safe to re-run after fixing flagged loads.');
+  } catch (err) {
+    setStatus(err.message, { error: true });
+  } finally {
+    $('fetchBtn').disabled = false;
+    $('pushBtn').disabled = fetchedTenders == null || fetchedTenders.length === 0;
+  }
+}
+
+$('fetchBtn').addEventListener('click', fetchLoads);
+$('pushBtn').addEventListener('click', sanitizeAndPush);
+loadRules();
+</script>
+</body>
+</html>
