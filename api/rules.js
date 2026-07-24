@@ -12,5 +12,6 @@ export default function handler(req, res) {
     flags: FLAG_RULES,
     overweightLbs: OVERWEIGHT_LBS,
     equipmentMap: EQUIPMENT_MAP,
+    identity: process.env.CANDIDATE_EMAIL ?? null,
   });
 }
