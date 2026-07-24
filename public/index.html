@@ -60,6 +60,8 @@
   th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
   td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
   .tbl-scroll { overflow-x: auto; }
+  th.col-select, td.col-select { width: 34px; text-align: center; padding-right: 4px; }
+  .col-select input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
   tr.row-flag td { background: var(--err-bg); }
   tr.row-near td { background: var(--warn-bg); }
   .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin: 10px 0 2px; }
@@ -191,6 +193,7 @@
     <div class="tbl-scroll">
       <table id="tendersTable">
         <thead><tr>
+          <th class="col-select"><input type="checkbox" id="selectAll" title="Select all" checked></th>
           <th>Load #</th><th>Shipper</th><th>Origin</th><th>Destination</th>
           <th>Ship</th><th>Deliver</th><th>Weight</th><th>Mode</th><th>Status</th>
         </tr></thead>
@@ -296,9 +299,10 @@ async function fetchLoads() {
     $('tendersCard').hidden = false;
     $('resultsCard').hidden = true;
     $('tendersSub').textContent = `${fetchedTenders.length} open tender(s) from ${data.source ?? 'the Walmart portal'}, raw values as displayed in the portal.`;
-    $('tendersTable').querySelector('tbody').innerHTML = fetchedTenders.map((t) => {
+    $('tendersTable').querySelector('tbody').innerHTML = fetchedTenders.map((t, i) => {
       const a = assessTender(t);
       return `<tr class="${a.cls}">
+        <td class="col-select"><input type="checkbox" class="row-select" data-idx="${i}" checked></td>
         <td class="mono">${esc(t.load_no)}</td>
         <td>${esc(t.shipper_nm)}</td>
         <td>${esc(t.orig_city)}, ${esc(t.orig_st)}</td>
@@ -309,10 +313,11 @@ async function fetchLoads() {
         <td class="mono">${esc(t.mode)}</td>
         <td>${a.tag}${a.note ? `<div class="sub" style="margin:4px 0 0">${esc(a.note)}</div>` : ''}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="9" class="empty">No open tenders right now.</td></tr>';
+    }).join('') || '<tr><td colspan="10" class="empty">No open tenders right now.</td></tr>';
 
-    $('pushBtn').disabled = fetchedTenders.length === 0;
-    setStatus(fetchedTenders.length ? `Fetched ${fetchedTenders.length} tender(s). Review, then Sanitize & Push.` : 'No open tenders to build.');
+    $('selectAll').checked = fetchedTenders.length > 0;
+    updateSelection();
+    setStatus(fetchedTenders.length ? `Fetched ${fetchedTenders.length} tender(s). Select which to load, then Sanitize & Push.` : 'No open tenders to build.');
   } catch (err) {
     setStatus(err.message, { error: true });
   } finally {
@@ -320,8 +325,25 @@ async function fetchLoads() {
   }
 }
 
+// Returns the tenders whose row checkbox is currently ticked.
+function selectedTenders() {
+  return [...document.querySelectorAll('.row-select:checked')].map((cb) => fetchedTenders[+cb.dataset.idx]);
+}
+
+// Sync the select-all checkbox state and the push button (label + enabled)
+// with the current row selection.
+function updateSelection() {
+  const rows = [...document.querySelectorAll('.row-select')];
+  const checked = rows.filter((cb) => cb.checked);
+  const selectAll = $('selectAll');
+  selectAll.checked = rows.length > 0 && checked.length === rows.length;
+  selectAll.indeterminate = checked.length > 0 && checked.length < rows.length;
+  $('pushBtn').disabled = checked.length === 0;
+  $('pushBtn').textContent = checked.length ? `Sanitize & Push (${checked.length})` : 'Sanitize & Push';
+}
+
 // Render one record as a color-coded JSON card: green if it loaded into the
-// SOR, red if it did not (rejected or held). Keys are dimmed for readability.
+// SHV System, red if it did not (rejected or held). Keys are dimmed for readability.
 // A load-number label sits above each card.
 function jsonCard(loadNumber, obj, ok) {
   const json = JSON.stringify(obj, null, 2)
@@ -334,14 +356,19 @@ function jsonCard(loadNumber, obj, ok) {
 }
 
 async function sanitizeAndPush() {
+  const selected = selectedTenders();
+  if (selected.length === 0) {
+    setStatus('Select at least one tender to load.', { error: true });
+    return;
+  }
   $('pushBtn').disabled = true;
   $('fetchBtn').disabled = true;
-  setStatus('Sanitizing and pushing eligible loads to the SHV System…', { busy: true });
+  setStatus(`Sanitizing and pushing ${selected.length} selected load(s) to the SHV System…`, { busy: true });
   try {
     const res = await fetch('/api/sanitize-push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ loads: fetchedTenders }),
+      body: JSON.stringify({ loads: selected }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -376,12 +403,22 @@ async function sanitizeAndPush() {
     setStatus(err.message, { error: true });
   } finally {
     $('fetchBtn').disabled = false;
-    $('pushBtn').disabled = fetchedTenders == null || fetchedTenders.length === 0;
+    updateSelection();
   }
 }
 
 $('fetchBtn').addEventListener('click', fetchLoads);
 $('pushBtn').addEventListener('click', sanitizeAndPush);
+
+// Select-all toggles every row; row changes keep the header + button in sync.
+$('selectAll').addEventListener('change', (e) => {
+  document.querySelectorAll('.row-select').forEach((cb) => { cb.checked = e.target.checked; });
+  updateSelection();
+});
+$('tendersTable').addEventListener('change', (e) => {
+  if (e.target.classList.contains('row-select')) updateSelection();
+});
+
 loadRules();
 </script>
 </body>
