@@ -172,7 +172,7 @@
 
   <div class="card">
     <h2>Actions</h2>
-    <p class="sub">Step 1: fetch today's open tenders. Step 2: sanitize them and push the eligible loads to the SHV SOR.</p>
+    <p class="sub">Step 1: fetch today's open tenders. Step 2: sanitize them and push the eligible loads to the SHV System.</p>
     <div class="actions">
       <button class="action" id="fetchBtn">Fetch Loads</button>
       <button class="action" id="pushBtn" disabled>Sanitize &amp; Push</button>
@@ -203,11 +203,11 @@
     <h2>Push results</h2>
     <p class="sub" id="sorMessage"></p>
     <div id="acceptedSection" class="result-section ok" hidden>
-      <h3>✅ Accepted into the SOR (<span id="acceptedCount"></span>)</h3>
+      <h3>✅ Accepted into the SHV System (<span id="acceptedCount"></span>)</h3>
       <div id="acceptedList"></div>
     </div>
     <div id="rejectedSection" class="result-section err" hidden>
-      <h3>❌ Rejected by the SOR (<span id="rejectedCount"></span>)</h3>
+      <h3>❌ Rejected by the SHV System (<span id="rejectedCount"></span>)</h3>
       <div id="rejectedList"></div>
     </div>
     <div id="flaggedSection" class="result-section warn" hidden>
@@ -336,7 +336,7 @@ function jsonCard(loadNumber, obj, ok) {
 async function sanitizeAndPush() {
   $('pushBtn').disabled = true;
   $('fetchBtn').disabled = true;
-  setStatus('Sanitizing and pushing eligible loads to the SHV SOR…', { busy: true });
+  setStatus('Sanitizing and pushing eligible loads to the SHV System…', { busy: true });
   try {
     const res = await fetch('/api/sanitize-push', {
       method: 'POST',
@@ -370,7 +370,7 @@ async function sanitizeAndPush() {
     ).join('');
 
     $('summaryLine').textContent =
-      `Summary: ${acc.length} pushed · ${rej.length} rejected by the SOR · ${flg.length} held for follow-up with Walmart.`;
+      `Summary: ${acc.length} pushed · ${rej.length} rejected by the SHV System · ${flg.length} held for follow-up with Walmart.`;
     setStatus('Done. Pushes are upserts, safe to re-run after fixing flagged loads.');
   } catch (err) {
     setStatus(err.message, { error: true });

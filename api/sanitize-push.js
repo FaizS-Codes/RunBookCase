@@ -85,25 +85,25 @@ export default async function handler(req, res) {
     try {
       response = await postBatch(chunk, email);
     } catch (err) {
-      return res.status(502).json({ error: `Could not reach the SHV SOR API: ${err.message}` });
+      return res.status(502).json({ error: `Could not reach the SHV System API: ${err.message}` });
     }
 
     if (response.status === 401) {
-      return res.status(502).json({ error: 'SHV SOR rejected the credentials (401). Check CANDIDATE_EMAIL.' });
+      return res.status(502).json({ error: 'SHV System rejected the credentials (401). Check CANDIDATE_EMAIL.' });
     }
     if (response.status === 429) {
-      return res.status(429).json({ error: 'SHV SOR rate/capacity limit hit even after retrying. Wait and push again — pushes are safe to retry.' });
+      return res.status(429).json({ error: 'SHV System rate/capacity limit hit even after retrying. Wait and push again — pushes are safe to retry.' });
     }
 
     let body;
     try {
       body = await response.json();
     } catch {
-      return res.status(502).json({ error: `SHV SOR returned an unreadable ${response.status} response` });
+      return res.status(502).json({ error: `SHV System returned an unreadable ${response.status} response` });
     }
 
     if (response.status !== 200 && response.status !== 422) {
-      return res.status(502).json({ error: `SHV SOR returned an unexpected ${response.status}: ${body?.message ?? ''}` });
+      return res.status(502).json({ error: `SHV System returned an unexpected ${response.status}: ${body?.message ?? ''}` });
     }
 
     sorMessage = body?.message ?? sorMessage;
