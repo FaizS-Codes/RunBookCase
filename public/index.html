@@ -92,8 +92,12 @@
   .flag-rule p { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
   .flag-rule .sop { font-size: 11px; color: var(--accent); font-weight: 600; }
 
+  .json-block { margin-bottom: 12px; }
+  .json-label { font-family: var(--mono); font-size: 12.5px; font-weight: 700; margin-bottom: 3px; }
+  .json-label.ok { color: var(--ok); }
+  .json-label.err { color: var(--err); }
   .json-card { font-family: var(--mono); font-size: 12px; line-height: 1.5; border-radius: 8px;
-    border: 1px solid var(--line); border-left-width: 4px; padding: 10px 14px; margin-bottom: 10px;
+    border: 1px solid var(--line); border-left-width: 4px; padding: 10px 14px;
     white-space: pre; overflow-x: auto; }
   .json-card.ok { background: var(--ok-bg); border-color: var(--line); border-left-color: var(--ok); }
   .json-card.err { background: var(--err-bg); border-color: var(--line); border-left-color: var(--err); }
@@ -318,11 +322,15 @@ async function fetchLoads() {
 
 // Render one record as a color-coded JSON card: green if it loaded into the
 // SOR, red if it did not (rejected or held). Keys are dimmed for readability.
-function jsonCard(obj, ok) {
+// A load-number label sits above each card.
+function jsonCard(loadNumber, obj, ok) {
   const json = JSON.stringify(obj, null, 2)
     .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
     .replace(/^(\s*)(&quot;.*?&quot;)(:)/gm, '$1<span class="k">$2</span>$3');
-  return `<div class="json-card ${ok ? 'ok' : 'err'}">${json}</div>`;
+  return `<div class="json-block">
+    <div class="json-label ${ok ? 'ok' : 'err'}">${esc(loadNumber || '(unknown)')}</div>
+    <div class="json-card ${ok ? 'ok' : 'err'}">${json}</div>
+  </div>`;
 }
 
 async function sanitizeAndPush() {
@@ -346,19 +354,19 @@ async function sanitizeAndPush() {
     $('acceptedSection').hidden = acc.length === 0;
     $('acceptedCount').textContent = acc.length;
     $('acceptedList').innerHTML = acc.map(({ after }) =>
-      jsonCard({ status: 'accepted', ...after }, true)
+      jsonCard(after?.load_number, { status: 'accepted', ...after }, true)
     ).join('');
 
     $('rejectedSection').hidden = rej.length === 0;
     $('rejectedCount').textContent = rej.length;
     $('rejectedList').innerHTML = rej.map((r) =>
-      jsonCard({ status: 'rejected', load_number: r.load_number, errors: r.errors ?? [], payload: r.after ?? null }, false)
+      jsonCard(r.load_number, { status: 'rejected', load_number: r.load_number, errors: r.errors ?? [], payload: r.after ?? null }, false)
     ).join('');
 
     $('flaggedSection').hidden = flg.length === 0;
     $('flaggedCount').textContent = flg.length;
     $('flaggedList').innerHTML = flg.map((f) =>
-      jsonCard({ status: 'held', load_number: f.load_number, reasons: (f.reasons ?? []).map((x) => x.detail) }, false)
+      jsonCard(f.load_number, { status: 'held', load_number: f.load_number, reasons: (f.reasons ?? []).map((x) => x.detail) }, false)
     ).join('');
 
     $('summaryLine').textContent =
