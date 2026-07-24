@@ -260,7 +260,7 @@ async function loadRules() {
     const rules = await (await fetch('/api/rules')).json();
     rulesData = rules;
     $('mappingTable').querySelector('tbody').innerHTML = rules.mapping.map((r) =>
-      `<tr><td class="mono">${esc(r.sor)}</td><td class="mono">${esc(r.source)}</td><td>${esc(r.transform)}</td></tr>`
+      `<tr><td>${esc(r.sor)}</td><td>${esc(r.source)}</td><td>${esc(r.transform)}</td></tr>`
     ).join('');
     $('flagRules').innerHTML = rules.flags.map((f) =>
       `<div class="flag-rule">
