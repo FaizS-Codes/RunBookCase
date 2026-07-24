@@ -144,7 +144,7 @@
           <h4>Field mapping &amp; formatting</h4>
           <div class="tbl-scroll">
             <table id="mappingTable">
-              <thead><tr><th>Walmart field</th><th>SOR field</th><th>Transform</th></tr></thead>
+              <thead><tr><th>New Load Information Required</th><th>Corresponding Information from Tender</th><th>Transformation Required</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -260,7 +260,7 @@ async function loadRules() {
     const rules = await (await fetch('/api/rules')).json();
     rulesData = rules;
     $('mappingTable').querySelector('tbody').innerHTML = rules.mapping.map((r) =>
-      `<tr><td class="mono">${esc(r.source)}</td><td class="mono">${esc(r.sor)}</td><td>${esc(r.transform)}</td></tr>`
+      `<tr><td class="mono">${esc(r.sor)}</td><td class="mono">${esc(r.source)}</td><td>${esc(r.transform)}</td></tr>`
     ).join('');
     $('flagRules').innerHTML = rules.flags.map((f) =>
       `<div class="flag-rule">
