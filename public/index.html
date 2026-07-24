@@ -92,6 +92,12 @@
   .flag-rule p { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
   .flag-rule .sop { font-size: 11px; color: var(--accent); font-weight: 600; }
 
+  .json-card { font-family: var(--mono); font-size: 12px; line-height: 1.5; border-radius: 8px;
+    border: 1px solid var(--line); border-left-width: 4px; padding: 10px 14px; margin-bottom: 10px;
+    white-space: pre; overflow-x: auto; }
+  .json-card.ok { background: var(--ok-bg); border-color: var(--line); border-left-color: var(--ok); }
+  .json-card.err { background: var(--err-bg); border-color: var(--line); border-left-color: var(--err); }
+  .json-card .k { color: var(--muted); }
   .empty { color: var(--muted); font-size: 13.5px; font-style: italic; }
   .summary-line { font-size: 13.5px; margin-top: 10px; color: var(--muted); }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
@@ -194,15 +200,7 @@
     <p class="sub" id="sorMessage"></p>
     <div id="acceptedSection" class="result-section ok" hidden>
       <h3>✅ Accepted into the SOR (<span id="acceptedCount"></span>)</h3>
-      <div class="tbl-scroll">
-        <table id="acceptedTable">
-          <thead><tr>
-            <th>Load #</th><th>BOL</th><th>Shipper</th><th>Lane</th>
-            <th>Ship (DDMMYYYY)</th><th>Deliver (DDMMYYYY)</th><th>Weight</th><th>Equipment</th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <div id="acceptedList"></div>
     </div>
     <div id="rejectedSection" class="result-section err" hidden>
       <h3>❌ Rejected by the SOR (<span id="rejectedCount"></span>)</h3>
@@ -318,9 +316,13 @@ async function fetchLoads() {
   }
 }
 
-function reasonTag(rule) {
-  const labels = { overweight: 'OVERWEIGHT', ambiguous_mode: 'AMBIGUOUS MODE', missing_weight: 'MISSING WEIGHT', invalid_field: 'BAD FIELD' };
-  return `<span class="tag warn">${labels[rule] ?? esc(rule).toUpperCase()}</span>`;
+// Render one record as a color-coded JSON card: green if it loaded into the
+// SOR, red if it did not (rejected or held). Keys are dimmed for readability.
+function jsonCard(obj, ok) {
+  const json = JSON.stringify(obj, null, 2)
+    .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
+    .replace(/^(\s*)(&quot;.*?&quot;)(:)/gm, '$1<span class="k">$2</span>$3');
+  return `<div class="json-card ${ok ? 'ok' : 'err'}">${json}</div>`;
 }
 
 async function sanitizeAndPush() {
@@ -343,36 +345,20 @@ async function sanitizeAndPush() {
 
     $('acceptedSection').hidden = acc.length === 0;
     $('acceptedCount').textContent = acc.length;
-    $('acceptedTable').querySelector('tbody').innerHTML = acc.map(({ after }) =>
-      `<tr>
-        <td class="mono">${esc(after?.load_number)}</td>
-        <td class="mono">${esc(after?.bol_number)}</td>
-        <td>${esc(after?.shipper_name)}</td>
-        <td>${esc(after?.origin_city)}, ${esc(after?.origin_state)} → ${esc(after?.destination_city)}, ${esc(after?.destination_state)}</td>
-        <td class="mono">${esc(after?.ship_date)}</td>
-        <td class="mono">${esc(after?.delivery_date)}</td>
-        <td class="mono">${esc(after?.weight)}</td>
-        <td>${esc(after?.equipment_type)}</td>
-      </tr>`
+    $('acceptedList').innerHTML = acc.map(({ after }) =>
+      jsonCard({ status: 'accepted', ...after }, true)
     ).join('');
 
     $('rejectedSection').hidden = rej.length === 0;
     $('rejectedCount').textContent = rej.length;
     $('rejectedList').innerHTML = rej.map((r) =>
-      `<div style="margin-bottom:10px">
-         <span class="tag err">${esc(r.load_number)}</span>
-         <ul class="reasons">${(r.errors ?? []).map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
-       </div>`
+      jsonCard({ status: 'rejected', load_number: r.load_number, errors: r.errors ?? [], payload: r.after ?? null }, false)
     ).join('');
 
     $('flaggedSection').hidden = flg.length === 0;
     $('flaggedCount').textContent = flg.length;
     $('flaggedList').innerHTML = flg.map((f) =>
-      `<div style="margin-bottom:10px">
-         <span class="tag warn">${esc(f.load_number)}</span>
-         ${(f.reasons ?? []).map((x) => reasonTag(x.rule)).join(' ')}
-         <ul class="reasons">${(f.reasons ?? []).map((x) => `<li>${esc(x.detail)}</li>`).join('')}</ul>
-       </div>`
+      jsonCard({ status: 'held', load_number: f.load_number, reasons: (f.reasons ?? []).map((x) => x.detail) }, false)
     ).join('');
 
     $('summaryLine').textContent =
